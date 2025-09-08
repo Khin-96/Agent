@@ -1,54 +1,51 @@
-# speech_utils.py
 import random
 import re
-from typing import List, Tuple
-from prompts import natural_laughter, add_speech_imperfections
+from typing import List
+from prompts import natural_laughter, add_speech_imperfections, blend_languages
 
-def process_speech(text: str, mode: str = "chaotic") -> str:
+def process_speech(text: str, user_input: str, mode: str = "chaotic") -> str:
     """
-    Process text to make it sound more natural with fillers and laughter
+    Process text to make it sound more natural:
+    - Adds laughter when earned
+    - Adds speech imperfections
+    - Blends Kiswahili & English if user code-switches
     """
     if not text or text.strip() == "":
         return text
     
-    # Step 1: Add laughter where appropriate
-    text = add_natural_laughter(text, mode)
+    # Step 1: Add natural laughter where appropriate
+    text = add_natural_laughter(text, mode, user_input)
     
-    # Step 2: Add speech imperfections
+    # Step 2: Add speech imperfections (fillers, pauses)
     text = add_speech_imperfections(text, mode)
+    
+    # Step 3: Blend languages if user used Kiswahili
+    text = blend_languages(text, user_input)
     
     return text
 
-def add_natural_laughter(text: str, mode: str) -> str:
+def add_natural_laughter(text: str, mode: str, user_input: str) -> str:
     """
-    Add natural laughter to appropriate places in text
+    Add laughter naturally if user’s message or response context calls for it
     """
-    # Patterns that might indicate laughter opportunities
     laughter_triggers = [
-        r"funny", r"lol", r"lmao", r"hilarious", r"haha", 
-        r"joke", r"comedy", r"laugh", r"chuckle", r"giggle"
+        r"😂", r"🤣", r"lol", r"lmao", r"hilarious", r"haha", 
+        r"joke", r"funny", r"banter", r"wild"
     ]
     
-    # Don't overdo it - only add laughter to some eligible sentences
     sentences = re.split(r'(?<=[.!?])\s+', text)
     result = []
     
     for sentence in sentences:
-        # Check if this sentence might warrant laughter
-        should_laugh = any(re.search(trigger, sentence.lower()) for trigger in laughter_triggers)
-        
-        # Also randomly add laughter to some sentences (5% chance)
-        random_laugh = random.random() < 0.05 and len(sentence.split()) > 3
+        should_laugh = any(re.search(trigger, user_input.lower()) for trigger in laughter_triggers)
+        random_laugh = random.random() < 0.15 and len(sentence.split()) > 3
         
         if should_laugh or random_laugh:
-            # Decide laughter position and intensity
             laughter_intensity = "medium"
-            if should_laugh and any(word in sentence.lower() for word in ["hilarious", "lmao", "dying"]):
+            if any(word in user_input.lower() for word in ["hilarious", "dying", "lmao"]):
                 laughter_intensity = "high"
             
-            # Add laughter either at the beginning, middle, or end
             position = random.choice(["start", "middle", "end"])
-            
             if position == "start":
                 laughter = natural_laughter(laughter_intensity, mode) + ", "
                 sentence = laughter + sentence
@@ -57,7 +54,7 @@ def add_natural_laughter(text: str, mode: str) -> str:
                 insert_pos = random.randint(2, len(words) - 2)
                 words.insert(insert_pos, natural_laughter(laughter_intensity, mode))
                 sentence = " ".join(words)
-            else:  # end
+            else:
                 sentence = sentence + " " + natural_laughter(laughter_intensity, mode)
         
         result.append(sentence)
